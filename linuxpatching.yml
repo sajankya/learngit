@@ -1,0 +1,27 @@
+---
+- hosts: ospatching
+  sudo: yes
+  gather_facts: yes
+
+  tasks:
+  - name: Check the application status
+    shell: ps -ef | grep -i ssh | grep -v grep > /dev/null; if [[ $? = 0 ]]; then echo "Appln_is_running"; else echo "Appln is not running"; fi
+    register: appln_status
+
+  - name : Display Application status
+    debug:
+      var: appln_status
+
+  - name: Stop here if application is running
+    fail:
+      msg: " '{{ inventory_hostname }}' is having Apllications running, Please stop application and retry patching"
+      when: appln_status.stdout == "Appln_is_running"
+
+  - name: Application is not running , performing yum upgrade
+    yum:
+      name: *.rpm
+      state: latest
+    reister: yum_update
+
+  - name: Check whether reboot is required, if kernel got updated
+    shell: CURRENTKERNEL=$(uname -r); NEWKERNEL=$(rpm -q --last kernel | awk '{print $1}' | sed -e 's/kernel-//'); if [[ $CURRENTKERNEL != $NEWKERNEL ]]; then echo "reboot_required"; else echo "reboot_not_required"; fi 
